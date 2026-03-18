@@ -2,7 +2,11 @@ module github.com/SaiTejaBandamidi/performance-comparison-go
 
 go 1.25.5
 
-require github.com/jackc/pgx/v5 v5.8.0
+require (
+	github.com/graphql-go/graphql v0.8.1
+	github.com/graphql-go/handler v0.2.4
+	github.com/jackc/pgx/v5 v5.8.0
+)
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect

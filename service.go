@@ -26,15 +26,21 @@ type BenchmarkService struct {
 }
 
 func NewBenchmarkService(metrics *MetricsStore) *BenchmarkService {
-	return &BenchmarkService{metrics: metrics}
+	return &BenchmarkService{
+		metrics: metrics,
+	}
 }
 
-func (s *BenchmarkService) Handle(ctx context.Context, transport string, req BenchmarkRequest) (*BenchmarkResponse, error) {
+func (s *BenchmarkService) Handle(
+	ctx context.Context,
+	transport string,
+	req BenchmarkRequest,
+) (*BenchmarkResponse, error) {
 	requestTime := time.Now().UTC()
+
 	load := s.metrics.Increment(transport)
 	defer s.metrics.Decrement(transport)
 
-	// Simulated work to compare REST vs GraphQL vs gRPC under similar workload
 	if req.WorkMS > 0 {
 		select {
 		case <-time.After(time.Duration(req.WorkMS) * time.Millisecond):
@@ -46,15 +52,14 @@ func (s *BenchmarkService) Handle(ctx context.Context, transport string, req Ben
 	responseTime := time.Now().UTC()
 	totalTimeMS := responseTime.Sub(requestTime).Milliseconds()
 
-	err := s.metrics.InsertMetric(
+	if err := s.metrics.InsertMetric(
 		ctx,
 		transport,
 		load,
 		requestTime,
 		responseTime,
 		totalTimeMS,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, err
 	}
 
@@ -65,7 +70,7 @@ func (s *BenchmarkService) Handle(ctx context.Context, transport string, req Ben
 		ResponseTime:   responseTime.Format(time.RFC3339Nano),
 		TotalTimeMS:    totalTimeMS,
 		CurrentLoad:    load,
-		FastestHint:    "Use SQL aggregation on api_request_metrics to determine the fastest transport overall",
+		FastestHint:    "Use PostgreSQL aggregation to identify whether REST or GraphQL is faster overall",
 		ProcessedValue: "Processed: " + req.Message,
 	}, nil
 }

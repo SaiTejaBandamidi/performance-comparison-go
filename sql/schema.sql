@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS api_request_metrics (
     id BIGSERIAL PRIMARY KEY,
-    request_type VARCHAR(20) NOT NULL,     -- graphql | rest | grpc
-    load INTEGER NOT NULL,                 -- in-flight requests at request time
+    request_type VARCHAR(20) NOT NULL,
+    load INTEGER NOT NULL,
     request_time TIMESTAMPTZ NOT NULL,
     response_time TIMESTAMPTZ NOT NULL,
     total_time_ms BIGINT NOT NULL,
