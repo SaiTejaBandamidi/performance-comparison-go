@@ -18,7 +18,7 @@ func StartRESTServer(service *BenchmarkService) *http.Server {
 
 		var req BenchmarkRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid json body", http.StatusBadRequest)
+			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
 
@@ -35,10 +35,13 @@ func StartRESTServer(service *BenchmarkService) *http.Server {
 		_ = json.NewEncoder(w).Encode(resp)
 	})
 
-	server := &http.Server{
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	return &http.Server{
 		Addr:    ":8000",
 		Handler: mux,
 	}
-
-	return server
 }

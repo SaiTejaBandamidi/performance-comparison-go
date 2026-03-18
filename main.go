@@ -2,30 +2,65 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewPostgresPool() (*pgxpool.Pool, error) {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgres://postgres:postgres@localhost:5432/benchmark_db?sslmode=disable"
+func main() {
+	log.Println("starting performance-comparison-go application")
+
+	cfg, err := LoadConfig("config.json")
+	if err != nil {
+		log.Fatalf("failed to load config.json: %v", err)
 	}
+
+	db, err := NewPostgresPool(cfg.Database)
+	if err != nil {
+		log.Fatalf("failed to connect to postgres: %v", err)
+	}
+	defer db.Close()
+
+	log.Println("connected to postgres successfully")
+
+	metricsStore := NewMetricsStore(db)
+	benchmarkService := NewBenchmarkService(metricsStore)
+
+	restServer := StartRESTServer(benchmarkService)
+	go func() {
+		log.Println("REST server listening on :8000")
+		if err := restServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("REST server error: %v", err)
+		}
+	}()
+
+	graphQLServer := StartGraphQLServer(benchmarkService)
+	go func() {
+		log.Println("GraphQL server listening on :8080")
+		if err := graphQLServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("GraphQL server error: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	log.Println("shutdown signal received")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, dbURL)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create pool: %w", err)
+	if err := restServer.Shutdown(ctx); err != nil {
+		log.Printf("error shutting down REST server: %v", err)
 	}
 
-	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("unable to ping db: %w", err)
+	if err := graphQLServer.Shutdown(ctx); err != nil {
+		log.Printf("error shutting down GraphQL server: %v", err)
 	}
 
-	return pool, nil
+	log.Println("application stopped")
 }
